@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APP Pedidos Compra · 53Biologics</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
+  :root {
+    --azul:    #3A5096;
+    --azul2:   #4F6FB5;
+    --purpura: #7B3FA0;
+    --blanco:  #ffffff;
+    --gris1:   #f5f4fa;
+    --gris2:   #e8e6f4;
+    --gris3:   #9a96b8;
+    --texto:   #1a1a2e;
+    --verde:   #22a06b;
+    --amarillo:#e2a900;
+    --rojo:    #d93025;
+    --sombra:  0 2px 12px rgba(58,80,150,.13);
+  }
+  body { display:flex; height:100vh; overflow:hidden; background:var(--gris1); color:var(--texto); }
+
+  /* LOGIN OVERLAY */
+  #login-screen {
+    position:fixed; inset:0; background:linear-gradient(135deg,#2a3a7a,#3A5096,#5a3080);
+    display:flex; align-items:center; justify-content:center; z-index:200;
+  }
+  #login-screen.hidden { display:none; }
+  .login-card {
+    background:#fff; border-radius:20px; padding:48px 52px; text-align:center;
+    box-shadow:0 24px 64px rgba(0,0,0,.3); max-width:400px; width:90%;
+    animation:fadeUp .3s ease;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .login-logo {
+    width:64px; height:64px; margin:0 auto 20px;
+    background:linear-gradient(135deg,#7B3FA0,#4F6FB5);
+    border-radius:16px; display:flex; align-items:center; justify-content:center;
+    font-weight:900; color:#fff; font-size:20px; letter-spacing:-.5px;
+    box-shadow:0 4px 16px rgba(123,63,160,.4);
+  }
+  .login-title { font-size:22px; font-weight:800; color:var(--azul); margin-bottom:6px; }
+  .login-sub   { font-size:14px; color:var(--gris3); margin-bottom:32px; }
+  .btn-ms {
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    width:100%; padding:14px; border:none; border-radius:10px;
+    background:linear-gradient(90deg,#4F6FB5,#7B3FA0); color:#fff;
+    font-size:15px; font-weight:600; cursor:pointer;
+    box-shadow:0 4px 16px rgba(79,111,181,.35); transition:filter .15s,transform .1s;
+  }
+  .btn-ms:hover  { filter:brightness(1.08); }
+  .btn-ms:active { transform:scale(.97); }
+  .login-footer { margin-top:20px; font-size:12px; color:var(--gris3); }
+
+  /* LOADING */
+  #loading-bar {
+    position:fixed; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,#4F6FB5,#7B3FA0);
+    z-index:300; display:none;
+    animation:slide 1.2s infinite;
+  }
+  @keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  #loading-bar.visible { display:block; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width:220px; min-width:220px;
+    background:linear-gradient(175deg,#2a3a7a 0%,#3A5096 45%,#5a3080 100%);
+    display:flex; flex-direction:column; padding:0;
+    box-shadow:3px 0 16px rgba(0,0,0,.22);
+  }
+  .sb-header { padding:22px 20px 18px; border-bottom:1px solid rgba(255,255,255,.1); }
+  .sb-logo   { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .sb-logo-icon {
+    width:38px; height:38px;
+    background:linear-gradient(135deg,#7B3FA0,#4F6FB5);
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-weight:900; color:#fff; font-size:13px;
+    box-shadow:0 2px 8px rgba(123,63,160,.4);
+  }
+  .sb-logo-text { color:#fff; font-size:15px; font-weight:700; line-height:1.2; }
+  .sb-logo-sub  { color:rgba(255,255,255,.55); font-size:11px; }
+  .sb-user      { color:rgba(255,255,255,.85); font-size:12.5px; }
+  .sb-badge {
+    display:inline-block;
+    background:linear-gradient(90deg,#7B3FA0,#4F6FB5);
+    color:#fff; font-size:10px; padding:2px 8px; border-radius:20px;
+    margin-top:4px; font-weight:600;
+  }
+  .sb-nav { flex:1; padding:12px 0; }
+  .sb-item {
+    display:flex; align-items:center; gap:12px;
+    padding:13px 20px; color:rgba(255,255,255,.75);
+    cursor:pointer; font-size:13.5px; font-weight:500;
+    transition:background .15s,color .15s; border-left:3px solid transparent;
+  }
+  .sb-item:hover { background:rgba(255,255,255,.08); color:#fff; }
+  .sb-item.active { background:rgba(255,255,255,.12); color:#fff; border-left:3px solid #c07de8; }
+  .sb-footer { padding:16px 20px; border-top:1px solid rgba(255,255,255,.1); display:flex; flex-direction:column; gap:8px; }
+  .sb-btn {
+    display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,.1); border-radius:8px;
+    padding:10px 12px; cursor:pointer; color:#fff; font-size:12.5px;
+    transition:background .15s; border:none; width:100%; text-align:left;
+  }
+  .sb-btn:hover { background:rgba(255,255,255,.18); }
+
+  /* MAIN */
+  #main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .page { display:none; flex-direction:column; height:100%; overflow:hidden; }
+  .page.active { display:flex; }
+  .page-header { padding:28px 36px 0; background:var(--blanco); border-bottom:1px solid var(--gris2); }
+  .page-title {
+    font-size:22px; font-weight:700; margin-bottom:4px;
+    background:linear-gradient(90deg,#3A5096,#7B3FA0);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .page-sub { font-size:13px; color:var(--gris3); margin-bottom:20px; }
+  .toolbar {
+    display:flex; align-items:center; gap:10px;
+    padding:16px 36px; background:var(--blanco); border-bottom:1px solid var(--gris2);
+  }
+  .search-wrap { position:relative; flex:1; max-width:300px; }
+  .search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--gris3); }
+  .search-wrap input {
+    width:100%; padding:8px 12px 8px 34px;
+    border:1.5px solid var(--gris2); border-radius:8px;
+    font-size:13px; outline:none; background:var(--gris1); transition:border .15s;
+  }
+  .search-wrap input:focus { border-color:var(--azul2); background:#fff; }
+  select.filtro {
+    padding:8px 12px; border:1.5px solid var(--gris2); border-radius:8px;
+    font-size:13px; background:var(--gris1); outline:none; cursor:pointer; color:var(--texto);
+  }
+  .btn {
+    padding:9px 18px; border:none; border-radius:8px; font-size:13px;
+    font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;
+    transition:filter .15s,transform .1s;
+  }
+  .btn:hover  { filter:brightness(1.08); }
+  .btn:active { transform:scale(.97); }
+  .btn-primary { background:linear-gradient(90deg,#4F6FB5,#7B3FA0); color:#fff; box-shadow:0 2px 8px rgba(79,111,181,.3); }
+  .btn-green   { background:var(--verde); color:#fff; }
+  .btn-ghost   { background:var(--gris2); color:var(--texto); }
+
+  /* TABLE */
+  .table-wrap { flex:1; overflow-y:auto; padding:20px 36px 30px; }
+  .empty-state { text-align:center; padding:60px 20px; color:var(--gris3); }
+  .empty-state .icon { font-size:48px; margin-bottom:12px; }
+  .empty-state p { font-size:15px; font-weight:600; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:var(--sombra); }
+  thead th {
+    padding:13px 16px; text-align:left; font-size:12px; font-weight:700;
+    color:var(--gris3); text-transform:uppercase; letter-spacing:.5px;
+    background:#fff; border-bottom:2px solid var(--gris2);
+  }
+  tbody tr { border-bottom:1px solid var(--gris2); transition:background .1s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:var(--gris1); }
+  tbody td { padding:13px 16px; font-size:13.5px; }
+  td.art { font-weight:600; color:var(--azul); }
+  td.imp { font-weight:700; color:var(--azul2); }
+
+  .badge { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:12px; font-weight:600; }
+  .badge::before { content:''; width:7px; height:7px; border-radius:50%; }
+  .badge-pendiente { background:#fff3cd; color:#856404; }
+  .badge-pendiente::before { background:#e2a900; }
+  .badge-completado { background:#d1f0e3; color:#155724; }
+  .badge-completado::before { background:#22a06b; }
+  .badge-borrador  { background:#e2e8f0; color:#4a5568; }
+  .badge-borrador::before  { background:#9aa5b8; }
+  .badge-aprobado  { background:#e8d5f5; color:#5a2080; }
+  .badge-aprobado::before  { background:#7B3FA0; }
+  .btn-elim {
+    padding:5px 12px; border:1.5px solid #fcc; border-radius:6px;
+    font-size:12px; color:var(--rojo); background:#fff6f6; cursor:pointer; font-weight:600;
+  }
+  .btn-elim:hover { background:#fcc; }
+
+  /* MODAL */
+  .overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(15,25,50,.45); z-index:100;
+    align-items:center; justify-content:center; backdrop-filter:blur(2px);
+  }
+  .overlay.open { display:flex; }
+  .modal {
+    background:#fff; border-radius:16px; width:560px; max-height:90vh;
+    overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:fadeUp .2s ease;
+  }
+  .modal-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 26px 18px; border-bottom:1px solid var(--gris2);
+  }
+  .modal-title { font-size:18px; font-weight:700; color:var(--azul); }
+  .modal-close {
+    width:32px; height:32px; border-radius:8px; border:none;
+    background:var(--gris1); cursor:pointer; font-size:16px; color:var(--gris3);
+    display:flex; align-items:center; justify-content:center; transition:background .15s;
+  }
+  .modal-close:hover { background:var(--gris2); }
+  .modal-body { padding:22px 26px; }
+  .section-label {
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.6px; color:var(--azul2); margin:18px 0 12px;
+  }
+  .section-label:first-child { margin-top:0; }
+  .section-line { flex:1; height:1.5px; background:var(--gris2); }
+  .form-row { display:grid; gap:14px; }
+  .form-row.cols2 { grid-template-columns:1fr 1fr; }
+  .form-group { display:flex; flex-direction:column; gap:6px; }
+  .form-group label { font-size:12px; font-weight:600; color:var(--gris3); }
+  .form-group label span { color:var(--rojo); margin-left:2px; }
+  .form-group input,.form-group select,.form-group textarea {
+    padding:9px 12px; border:1.5px solid var(--gris2); border-radius:8px;
+    font-size:13.5px; outline:none; background:var(--gris1); transition:border .15s,background .15s; font-family:inherit;
+  }
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--azul2); background:#fff; }
+  .form-group textarea { resize:vertical; min-height:70px; }
+  .search-art-wrap { position:relative; }
+  .search-art-wrap input { padding-left:32px; }
+  .search-art-wrap > svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--gris3); pointer-events:none; }
+  #art-dropdown {
+    display:none; position:absolute; top:100%; left:0; right:0; z-index:10;
+    background:#fff; border:1.5px solid var(--azul2); border-top:none;
+    border-radius:0 0 8px 8px; max-height:200px; overflow-y:auto;
+    box-shadow:0 8px 20px rgba(0,0,0,.12);
+  }
+  #art-dropdown.open { display:block; }
+  .art-item { padding:10px 14px; cursor:pointer; font-size:13px; transition:background .1s; border-bottom:1px solid var(--gris2); }
+  .art-item:last-child { border-bottom:none; }
+  .art-item:hover { background:var(--gris1); }
+  .art-item strong { display:block; color:var(--azul); font-size:13.5px; }
+  .art-item span   { color:var(--gris3); font-size:12px; }
+  .modal-footer {
+    display:flex; justify-content:flex-end; gap:10px;
+    padding:16px 26px 22px; border-top:1px solid var(--gris2);
+  }
+
+  /* APROBACIÓN */
+  .apro-wrap { flex:1; overflow-y:auto; padding:20px 36px 30px; }
+  .proveedor-card { background:#fff; border-radius:12px; margin-bottom:16px; box-shadow:var(--sombra); overflow:hidden; }
+  .proveedor-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:1px solid var(--gris2); cursor:pointer; user-select:none;
+  }
+  .proveedor-header:hover { background:var(--gris1); }
+  .proveedor-name { display:flex; align-items:center; gap:10px; font-weight:700; color:var(--azul); font-size:14.5px; }
+  .proveedor-icon { width:34px; height:34px; background:var(--gris2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .linea-row {
+    display:flex; align-items:center; gap:14px; padding:12px 20px;
+    border-bottom:1px solid var(--gris2); transition:background .1s;
+  }
+  .linea-row:last-child { border-bottom:none; }
+  .linea-row:hover { background:var(--gris1); }
+  .linea-check {
+    width:18px; height:18px; border:2px solid var(--gris3); border-radius:5px;
+    cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .15s;
+  }
+  .linea-check.checked { background:var(--azul2); border-color:var(--azul2); }
+  .linea-check.checked::after { content:'✓'; color:#fff; font-size:12px; font-weight:700; }
+  .linea-info { flex:1; }
+  .linea-art  { font-weight:600; color:var(--texto); font-size:13.5px; }
+  .linea-meta { color:var(--gris3); font-size:12px; margin-top:2px; }
+  .linea-imp  { font-weight:700; color:var(--azul2); font-size:14px; }
+  .resumen-bar {
+    background:#fff; border-radius:12px; box-shadow:var(--sombra);
+    padding:18px 24px; display:flex; align-items:center; gap:32px; margin-bottom:16px; flex-wrap:wrap;
+  }
+  .res-item { display:flex; flex-direction:column; gap:3px; }
+  .res-label { font-size:11px; font-weight:700; color:var(--gris3); text-transform:uppercase; letter-spacing:.4px; }
+  .res-valor { font-size:20px; font-weight:800; color:var(--azul); }
+  .res-valor.verde { color:var(--verde); }
+  .confirm-table { width:100%; border-collapse:collapse; margin-top:12px; }
+  .confirm-table td { padding:9px 12px; font-size:13.5px; border-bottom:1px solid var(--gris2); }
+  .confirm-table td:first-child { color:var(--gris3); font-weight:600; width:120px; }
+  .confirm-table td:last-child  { font-weight:700; color:var(--azul); text-align:right; }
+  .confirm-art { background:var(--gris1); border-radius:8px; padding:12px 14px; margin-top:8px; }
+  .confirm-art-name { font-weight:700; color:var(--azul); margin-bottom:4px; }
+  .confirm-art-calc { font-size:13px; color:var(--gris3); }
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--gris2); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- LOADING BAR -->
+<div id="loading-bar"></div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">53B</div>
+    <div class="login-title">53Biologics ERP</div>
+    <div class="login-sub">Gestión de Pedidos de Compra</div>
+    <button class="btn-ms" onclick="login()">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>
+      Iniciar sesión con Microsoft
+    </button>
+    <div class="login-footer">Accede con tu cuenta @53biologics.com</div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sb-header">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">53B</div>
+      <div>
+        <div class="sb-logo-text">53Biologics</div>
+        <div class="sb-logo-sub">ERP Compras</div>
+      </div>
+    </div>
+    <div class="sb-user" id="sb-username">—</div>
+    <div class="sb-badge" id="sb-rol-badge">Solicitante</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-item active" onclick="showPage('pedidos')" id="nav-pedidos">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      Solicitar Pedido
+    </div>
+    <div class="sb-item" onclick="showPage('aprobacion')" id="nav-aprobacion">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Aprobación
+    </div>
+  </nav>
+  <div class="sb-footer">
+    <button class="sb-btn" onclick="cambiarRol()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <span id="rol-texto">Cambiar a Aprobador</span>
+    </button>
+    <button class="sb-btn" onclick="logout()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Cerrar sesión
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+<!-- PÁGINA: SOLICITAR PEDIDO -->
+<div class="page active" id="page-pedidos">
+  <div id="api-status" style="display:none;background:#fff3cd;color:#856404;padding:8px 36px;font-size:12.5px;border-bottom:1px solid #ffc107;"></div>
+  <div class="page-header">
+    <div class="page-title">📋 Solicitar Pedido</div>
+    <div class="page-sub">Gestiona tus solicitudes de compra</div>
+  </div>
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Buscar pedido…" id="buscar-pedidos" oninput="filtrarPedidos()">
+    </div>
+    <select class="filtro" id="filtro-estado" onchange="filtrarPedidos()">
+      <option value="">Todos los estados</option>
+      <option value="Pendiente">Pendiente</option>
+      <option value="Completado">Completado</option>
+      <option value="Borrador">Borrador</option>
+      <option value="Aprobado">Aprobado</option>
+    </select>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost" onclick="cargarDatos()" title="Recargar datos">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button class="btn btn-primary" onclick="abrirModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Crear Pedido
+    </button>
+  </div>
+  <div class="table-wrap">
+    <div id="pedidos-empty" class="empty-state" style="display:none">
+      <div class="icon">📋</div>
+      <p>No hay pedidos. Crea el primero.</p>
+    </div>
+    <table id="tabla-pedidos-wrap" style="display:none">
+      <thead>
+        <tr>
+          <th>Artículo</th><th>Cantidad</th><th>Solicitante</th>
+          <th>Proyecto</th><th>Importe</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-pedidos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PÁGINA: APROBACIÓN -->
+<div class="page" id="page-aprobacion">
+  <div class="page-header">
+    <div class="page-title">✅ Aprobación de Pedidos</div>
+    <div class="page-sub">Revisa y aprueba pedidos para enviar a Sage 200</div>
+  </div>
+  <div class="apro-wrap">
+    <div class="resumen-bar">
+      <div class="res-item"><span class="res-label">Líneas Seleccionadas</span><span class="res-valor" id="res-lineas">0</span></div>
+      <div class="res-item"><span class="res-label">Unidades</span><span class="res-valor" id="res-unidades">0</span></div>
+      <div class="res-item"><span class="res-label">Importe</span><span class="res-valor verde" id="res-importe">€0,00</span></div>
+      <div style="flex:1"></div>
+      <button class="btn btn-green" onclick="abrirConfirmar()" id="btn-enviar" disabled style="opacity:.45">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Enviar a Sage 200
+      </button>
+    </div>
+    <div id="apro-contenido"></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- MODAL: CREAR PEDIDO -->
+<div class="overlay" id="modal-crear">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Crear Nuevo Pedido</span>
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Artículo <div class="section-line"></div>
+      </div>
+      <div class="form-group">
+        <label>Artículo <span>*</span></label>
+        <div class="search-art-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="inp-articulo" placeholder="Busca: 001234 o Ácido…" autocomplete="off" oninput="buscarArticulo(this.value)" onfocus="buscarArticulo(this.value)">
+          <div id="art-dropdown"></div>
+        </div>
+        <input type="hidden" id="inp-art-codigo">
+        <input type="hidden" id="inp-art-precio">
+        <input type="hidden" id="inp-art-proveedor">
+        <input type="hidden" id="inp-art-desc">
+      </div>
+      <div class="section-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Información <div class="section-line"></div>
+      </div>
+      <div class="form-row cols2">
+        <div class="form-group"><label>Solicitante <span>*</span></label><input type="text" id="inp-solicitante" readonly></div>
+        <div class="form-group"><label>Fecha necesaria <span>*</span></label><input type="date" id="inp-fecha"></div>
+      </div>
+      <div class="form-row cols2">
+        <div class="form-group"><label>Firma <span>*</span></label><input type="text" id="inp-firma" placeholder="Nombre y apellidos…"></div>
+        <div class="form-group"></div>
+      </div>
+      <div class="section-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+        Cantidad <div class="section-line"></div>
+      </div>
+      <div class="form-row cols2">
+        <div class="form-group"><label>Unidades <span>*</span></label><input type="number" id="inp-cantidad" min="1" placeholder="0" oninput="calcImporte()"></div>
+        <div class="form-group"><label>Almacén <span>*</span></label>
+          <select id="inp-almacen"><option value="">Seleccionar…</option></select>
+        </div>
+      </div>
+      <div class="section-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Clasificación <div class="section-line"></div>
+      </div>
+      <div class="form-row cols2">
+        <div class="form-group"><label>Proyecto <span>*</span></label>
+          <select id="inp-proyecto"><option value="">Seleccionar…</option></select>
+        </div>
+        <div class="form-group"><label>Departamento <span>*</span></label>
+          <select id="inp-dpto"><option value="">Seleccionar…</option></select>
+        </div>
+      </div>
+      <div class="section-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Observaciones <div class="section-line"></div>
+      </div>
+      <div class="form-group">
+        <label>Observaciones</label>
+        <textarea id="inp-obs" placeholder="Notas adicionales…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div style="margin-right:auto;font-size:13px;color:var(--gris3)" id="importe-preview"></div>
+      <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-crear-pedido" onclick="crearPedido()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Crear Pedido
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRMAR SAGE -->
+<div class="overlay" id="modal-confirmar">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">⚠️ Confirmar Envío a Sage</span>
+      <button class="modal-close" onclick="cerrarConfirmar()">✕</button>
+    </div>
+    <div class="modal-body">
+      <table class="confirm-table" id="confirm-detalle"></table>
+      <div id="confirm-arts"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarConfirmar()">Cancelar</button>
+      <button class="btn btn-green" onclick="enviarSage()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Confirmar Envío
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════
+const CLIENT_ID  = "3c19d742-04ee-4351-bb66-1d7a01b64bfa";
+const TENANT_ID  = "37ca1acc-fdd4-4b89-bef3-6390ae212871";
+// OneDrive personal de rvelazquez — accesible con Files.ReadWrite sin admin
+const DRIVE_ID   = "b!JXn6W1-WLUm_Cs7hMdH72xPfvICYQI1GjbNnMQapvjYVyP84_d9XTbbsYPPAOmyd";
+const FILE_ID    = "01WJ33LESD74SJF5Q44VC3E65TNYR6CXYZ";
+const GRAPH_BASE = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${FILE_ID}/workbook/tables`;
+
+const msalConfig = {
+  auth: {
+    clientId: CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+    redirectUri: window.location.origin,
+    navigateToLoginRequestUrl: false
+  },
+  cache: { cacheLocation:"localStorage" },
+  system: { allowRedirectInIframe: true }
+};
+const scopes = ["User.Read","Files.ReadWrite"];
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let currentUser  = null;
+let pedidos      = [];
+let articulos    = [];
+let proyectos    = [];
+let almacenes    = [];
+let departamentos= [];
+let rolActual    = "Solicitante";
+let seleccionados= new Set();
+
+// MSAL v2 — constructor síncrono, sin initialize()
+// var en lugar de const para evitar zona muerta de JavaScript
+var msalApp = new msal.PublicClientApplication(msalConfig);
+
+// Detectar si estamos dentro de Teams (iframe) o navegador normal
+const enTeams = window.parent !== window || navigator.userAgent.includes("Teams");
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT — manejar redirect de vuelta tras login
+// ═══════════════════════════════════════════════════════════════
+(async function() {
+  // Procesar respuesta de redirect si venimos de un loginRedirect
+  try {
+    const resp = await msalApp.handleRedirectPromise();
+    if (resp && resp.account) {
+      currentUser = resp.account;
+      iniciarApp();
+      return;
+    }
+  } catch(e) { console.warn("Redirect handle error:", e); }
+
+  const accounts = msalApp.getAllAccounts();
+  if (accounts.length > 0) {
+    currentUser = accounts[0];
+    iniciarApp();
+  }
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════════════════
+async function login() {
+  try {
+    if (enTeams) {
+      // En Teams usar redirect (los popups están bloqueados)
+      await msalApp.loginRedirect({ scopes });
+    } else {
+      const result = await msalApp.loginPopup({ scopes });
+      currentUser  = result.account;
+      iniciarApp();
+    }
+  } catch(e) {
+    console.error("Login error:", e);
+    alert("Error al iniciar sesión: " + e.message);
+  }
+}
+
+async function logout() {
+  if (enTeams) {
+    await msalApp.logoutRedirect();
+  } else {
+    await msalApp.logoutPopup();
+    location.reload();
+  }
+}
+
+async function getToken() {
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes, account: currentUser });
+    return r.accessToken;
+  } catch {
+    if (enTeams) {
+      await msalApp.acquireTokenRedirect({ scopes });
+      return null;
+    }
+    const r = await msalApp.acquireTokenPopup({ scopes });
+    return r.accessToken;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GRAPH API
+// ═══════════════════════════════════════════════════════════════
+async function graphGet(url) {
+  const token = await getToken();
+  const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+  if (!r.ok) throw new Error(`Graph error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function graphPost(url, body) {
+  const token = await getToken();
+  const r = await fetch(url, {
+    method:"POST",
+    headers:{ Authorization:`Bearer ${token}`, "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Graph error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function graphPatch(url, body) {
+  const token = await getToken();
+  const r = await fetch(url, {
+    method:"PATCH",
+    headers:{ Authorization:`Bearer ${token}`, "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Graph error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+// Lee una tabla de Excel y devuelve array de objetos {columna:valor}
+async function leerTabla(nombre) {
+  const [colsData, rowsData] = await Promise.all([
+    graphGet(`${GRAPH_BASE}/${nombre}/columns`),
+    graphGet(`${GRAPH_BASE}/${nombre}/rows`)
+  ]);
+  const cols = colsData.value.map(c => c.name);
+  return rowsData.value.map(row => {
+    const obj = { _index: row.index };
+    row.values[0].forEach((v, i) => { obj[cols[i]] = v; });
+    return obj;
+  });
+}
+
+// Añade una fila a una tabla de Excel
+async function añadirFila(tabla, valores) {
+  return graphPost(`${GRAPH_BASE}/${tabla}/rows/add`, { values: [valores] });
+}
+
+// Actualiza una fila por índice
+async function actualizarFila(tabla, index, valores) {
+  return graphPatch(`${GRAPH_BASE}/${tabla}/rows/itemAt(index=${index})`, { values: [valores] });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  APP INIT
+// ═══════════════════════════════════════════════════════════════
+async function iniciarApp() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("sb-username").textContent = currentUser.name || currentUser.username;
+  const nombre = currentUser.name || "";
+  const email  = currentUser.username || "";
+  document.getElementById("inp-solicitante").value = nombre ? `${nombre} · ${email}` : email;
+
+  // Fecha default
+  const hoy = new Date();
+  hoy.setDate(hoy.getDate() + 7);
+  document.getElementById("inp-fecha").value = hoy.toISOString().split("T")[0];
+
+  await cargarDatos();
+}
+
+function setLoading(on) {
+  document.getElementById("loading-bar").classList.toggle("visible", on);
+}
+
+// Datos de fallback para cuando la API no carga
+const FALLBACK = {
+  proyectos:    [{Codigo:"PROJ001",Nombre:"Ampliación Planta",Activo:"Sí"},{Codigo:"PROJ002",Nombre:"Automatización",Activo:"Sí"},{Codigo:"GENERAL",Nombre:"General / Sin proyecto",Activo:"Sí"}],
+  almacenes:    [{Nombre:"Almacen Central"},{Nombre:"Almacen Produccion"}],
+  departamentos:[{Nombre:"Compras"},{Nombre:"Almacen"},{Nombre:"Produccion"},{Nombre:"Ingeniería"}],
+  articulos:    [
+    {Codigo:"BIO-001",Descripcion:"Medio de cultivo DMEM High Glucose - Bolsa 10L",Proveedor:"GIBCO THERMO FISHER",Precio_Unitario:285.00,Activo:"Sí"},
+    {Codigo:"BIO-002",Descripcion:"Suero Bovino Fetal (FBS) Heat Inactivated - Botella 500ml",Proveedor:"SIGMA-ALDRICH",Precio_Unitario:412.50,Activo:"Sí"},
+    {Codigo:"BIO-003",Descripcion:"PBS Tampon Fosfato Salino 10x - Garrafa 10L",Proveedor:"LONZA",Precio_Unitario:98.00,Activo:"Sí"},
+    {Codigo:"BIO-004",Descripcion:"Bolsa Biorreactor Single-Use 50L - Sartorius Biostat STR",Proveedor:"SARTORIUS",Precio_Unitario:1850.00,Activo:"Sí"},
+    {Codigo:"BIO-005",Descripcion:"Resina Proteína A MabSelect SuRe - Columna 1L",Proveedor:"CYTIVA",Precio_Unitario:4200.00,Activo:"Sí"},
+    {Codigo:"BIO-006",Descripcion:"Membrana Filtracion Esteril 0.22um Millipak 200",Proveedor:"MERCK MILLIPORE",Precio_Unitario:320.00,Activo:"Sí"},
+    {Codigo:"BIO-007",Descripcion:"Gentamicina Sulfato Solucion 50mg/ml - Vial 20ml",Proveedor:"LONZA",Precio_Unitario:87.50,Activo:"Sí"},
+    {Codigo:"BIO-008",Descripcion:"L-Glutamina 200mM - Botella 100ml",Proveedor:"GIBCO THERMO FISHER",Precio_Unitario:64.00,Activo:"Sí"},
+    {Codigo:"BIO-009",Descripcion:"NaOH Solucion 1M para Sanitizacion - Garrafa 20L",Proveedor:"PANREAC",Precio_Unitario:145.00,Activo:"Sí"},
+    {Codigo:"BIO-010",Descripcion:"Bolsas Transfer Esteriles Single-Use 2L - Pack 10ud",Proveedor:"SARTORIUS",Precio_Unitario:210.00,Activo:"Sí"},
+    {Codigo:"BIO-011",Descripcion:"Kit ELISA Cuantificacion IgG - 96 pocillos",Proveedor:"REPLIGEN",Precio_Unitario:520.00,Activo:"Sí"},
+    {Codigo:"BIO-012",Descripcion:"Guantes Nitrilo Sin Polvo Talla M - Caja 100ud",Proveedor:"KIMBERLY-CLARK",Precio_Unitario:18.50,Activo:"Sí"},
+    {Codigo:"BIO-013",Descripcion:"Tubo Conector TC Sanitario 1.5 Pulgadas - Pack 5ud",Proveedor:"ALFA LAVAL",Precio_Unitario:135.00,Activo:"Sí"},
+    {Codigo:"BIO-014",Descripcion:"Amortiguador Citrato Sodico pH 5.5 - Solucion 50L",Proveedor:"LONZA",Precio_Unitario:390.00,Activo:"Sí"},
+    {Codigo:"BIO-015",Descripcion:"Crioviales Externally Threaded 1.8ml - Caja 500ud",Proveedor:"NUNC THERMO FISHER",Precio_Unitario:245.00,Activo:"Sí"}
+  ]
+};
+
+async function cargarDatos() {
+  setLoading(true);
+  let apiOk = true;
+  try {
+    [articulos, pedidos, proyectos, almacenes, departamentos] = await Promise.all([
+      leerTabla("tArticulos"),
+      leerTabla("tPedidos"),
+      leerTabla("tProyectos"),
+      leerTabla("tAlmacenes"),
+      leerTabla("tDepartamentos")
+    ]);
+
+    const lineas = await leerTabla("tLineasPedido");
+    pedidos.forEach(p => {
+      const l = lineas.find(x => x.Pedido_ID === p.ID) || {};
+      p._linea        = l;
+      p._lineaIndex   = l._index;
+      p.Articulo_Desc = l.Articulo_Descripcion || p.ID;
+      p.Articulo_Cod  = l.Articulo_Codigo || "";
+      p.Cantidad      = l.Cantidad || 0;
+      p.Proveedor     = l.Proveedor || "";
+      p.Precio        = l.Precio_Unitario || 0;
+    });
+  } catch(e) {
+    console.warn("API error:", e);
+    apiOk = false;
+    window._lastApiError = e.message;
+    if (!articulos.length)    articulos    = FALLBACK.articulos;
+    if (!proyectos.length)    proyectos    = FALLBACK.proyectos;
+    if (!almacenes.length)    almacenes    = FALLBACK.almacenes;
+    if (!departamentos.length)departamentos= FALLBACK.departamentos;
+  } finally {
+    setLoading(false);
+  }
+
+  rellenarSelects(apiOk);
+  renderPedidos();
+  renderAprobacion();
+}
+
+function rellenarSelects(apiOk) {
+  const selProy = document.getElementById("inp-proyecto");
+  const selAlm  = document.getElementById("inp-almacen");
+  const selDpto = document.getElementById("inp-dpto");
+
+  selProy.innerHTML = '<option value="">Seleccionar…</option>' +
+    proyectos.filter(p => p.Activo === "Sí" || p.Activo === true).map(p =>
+      `<option value="${p.Codigo}">${p.Codigo} · ${p.Nombre}</option>`).join("");
+
+  selAlm.innerHTML = '<option value="">Seleccionar…</option>' +
+    almacenes.map(a => `<option>${a.Nombre}</option>`).join("");
+
+  selDpto.innerHTML = '<option value="">Seleccionar…</option>' +
+    departamentos.map(d => `<option>${d.Nombre}</option>`).join("");
+
+  if (!apiOk) {
+    document.getElementById("api-status").textContent = "⚠️ Modo local — Error: " + (window._lastApiError || "desconocido");
+    document.getElementById("api-status").style.display = "block";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NAVEGACIÓN / ROL
+// ═══════════════════════════════════════════════════════════════
+function showPage(p) {
+  document.querySelectorAll(".page").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".sb-item").forEach(el => el.classList.remove("active"));
+  document.getElementById("page-"+p).classList.add("active");
+  document.getElementById("nav-"+p).classList.add("active");
+}
+
+function cambiarRol() {
+  rolActual = rolActual === "Solicitante" ? "Aprobador" : "Solicitante";
+  document.getElementById("sb-rol-badge").textContent = rolActual;
+  document.getElementById("rol-texto").textContent =
+    rolActual === "Solicitante" ? "Cambiar a Aprobador" : "Cambiar a Solicitante";
+  showPage(rolActual === "Aprobador" ? "aprobacion" : "pedidos");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TABLA PEDIDOS
+// ═══════════════════════════════════════════════════════════════
+function badgeClass(e) {
+  const m = {Pendiente:"pendiente",Completado:"completado",Borrador:"borrador",Aprobado:"aprobado"};
+  return "badge badge-"+(m[e]||"borrador");
+}
+
+function renderPedidos(lista) {
+  lista = lista || pedidos;
+  const tb    = document.getElementById("tabla-pedidos");
+  const wrap  = document.getElementById("tabla-pedidos-wrap");
+  const empty = document.getElementById("pedidos-empty");
+
+  if (!lista.length) {
+    wrap.style.display  = "none";
+    empty.style.display = "block";
+    return;
+  }
+  wrap.style.display  = "table";
+  empty.style.display = "none";
+
+  tb.innerHTML = lista.map(p => `
+    <tr>
+      <td class="art">(${p.Articulo_Cod}) ${p.Articulo_Desc}</td>
+      <td>${p.Cantidad}</td>
+      <td style="color:var(--azul2);font-weight:500">${(p.Solicitante||"").split("@")[0]}</td>
+      <td><span style="background:var(--gris2);padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600">${p.Proyecto||""}</span></td>
+      <td class="imp">€${(+p.Importe_Total||0).toLocaleString("es-ES",{minimumFractionDigits:2})}</td>
+      <td><span class="${badgeClass(p.Estado)}">${p.Estado}</span></td>
+      <td><button class="btn-elim" onclick="eliminarPedido(${p._index})">Eliminar</button></td>
+    </tr>`).join("");
+}
+
+function filtrarPedidos() {
+  const q = document.getElementById("buscar-pedidos").value.toLowerCase();
+  const e = document.getElementById("filtro-estado").value;
+  renderPedidos(pedidos.filter(p =>
+    (!q || (p.Articulo_Desc||"").toLowerCase().includes(q) || (p.ID||"").toLowerCase().includes(q)) &&
+    (!e || p.Estado === e)
+  ));
+}
+
+async function eliminarPedido(index) {
+  if (!confirm("¿Eliminar este pedido?")) return;
+  setLoading(true);
+  try {
+    // Marcamos como Borrador (no borramos la fila para preservar histórico)
+    const p = pedidos.find(x => x._index === index);
+    if (p) {
+      const vals = [p.ID,p.Solicitante,p.Departamento,p.Proyecto,p.Fecha_Solicitud,
+                    p.Fecha_Necesaria,"Borrador",p.Importe_Total,p.Proveedor_Principal,p.Observaciones];
+      await actualizarFila("tPedidos", index, vals);
+    }
+    await cargarDatos();
+  } catch(e) { alert("Error: "+e.message); }
+  finally { setLoading(false); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODAL CREAR PEDIDO
+// ═══════════════════════════════════════════════════════════════
+function abrirModal()  { document.getElementById("modal-crear").classList.add("open"); }
+function cerrarModal() {
+  document.getElementById("modal-crear").classList.remove("open");
+  document.getElementById("inp-articulo").value = "";
+  ["inp-art-codigo","inp-art-precio","inp-art-proveedor","inp-art-desc"].forEach(id =>
+    document.getElementById(id).value = "");
+  document.getElementById("inp-cantidad").value = "";
+  document.getElementById("inp-obs").value = "";
+  document.getElementById("inp-firma").value = "";
+  document.getElementById("importe-preview").textContent = "";
+  document.getElementById("art-dropdown").classList.remove("open");
+}
+
+function buscarArticulo(q) {
+  const dd = document.getElementById("art-dropdown");
+  if (!q) { dd.className=""; return; }
+  const res = articulos.filter(a =>
+    a.Activo === "Sí" && (
+      (a.Codigo||"").includes(q) ||
+      (a.Descripcion||"").toLowerCase().includes(q.toLowerCase()) ||
+      (a.Proveedor||"").toLowerCase().includes(q.toLowerCase())
+    )
+  ).slice(0,8);
+  if (!res.length) { dd.className=""; return; }
+  dd.innerHTML = res.map(a => `
+    <div class="art-item" onclick="seleccionarArticulo('${a.Codigo}','${a.Descripcion}',${a.Precio_Unitario},'${a.Proveedor}')">
+      <strong>(${a.Codigo}) ${a.Descripcion}</strong>
+      <span>${a.Proveedor} · €${(+a.Precio_Unitario).toFixed(2)}/ud</span>
+    </div>`).join("");
+  dd.className = "open";
+}
+
+function seleccionarArticulo(cod, desc, precio, prov) {
+  document.getElementById("inp-articulo").value   = `(${cod}) ${desc}`;
+  document.getElementById("inp-art-codigo").value  = cod;
+  document.getElementById("inp-art-precio").value  = precio;
+  document.getElementById("inp-art-proveedor").value = prov;
+  document.getElementById("inp-art-desc").value    = desc;
+  document.getElementById("art-dropdown").className = "";
+  calcImporte();
+}
+
+function calcImporte() {
+  const cant  = parseFloat(document.getElementById("inp-cantidad").value)||0;
+  const precio= parseFloat(document.getElementById("inp-art-precio").value)||0;
+  const imp   = cant * precio;
+  document.getElementById("importe-preview").textContent =
+    imp > 0 ? `Importe: €${imp.toLocaleString("es-ES",{minimumFractionDigits:2})}` : "";
+}
+
+async function crearPedido() {
+  const cod   = document.getElementById("inp-art-codigo").value;
+  const desc  = document.getElementById("inp-art-desc").value;
+  const cant  = parseFloat(document.getElementById("inp-cantidad").value);
+  const precio= parseFloat(document.getElementById("inp-art-precio").value);
+  const prov  = document.getElementById("inp-art-proveedor").value;
+  const proy  = document.getElementById("inp-proyecto").value;
+  const alm   = document.getElementById("inp-almacen").value;
+  const dpto  = document.getElementById("inp-dpto").value;
+  const fecha = document.getElementById("inp-fecha").value;
+  const obs   = document.getElementById("inp-obs").value;
+  const firma = document.getElementById("inp-firma").value.trim();
+
+  if (!cod)          { alert("Selecciona un artículo"); return; }
+  if (!cant||cant<1) { alert("Introduce las unidades"); return; }
+  if (!proy)         { alert("Selecciona un proyecto"); return; }
+  if (!alm)          { alert("Selecciona un almacén"); return; }
+  if (!dpto)         { alert("Selecciona un departamento"); return; }
+  if (!firma)        { alert("Introduce tu firma"); return; }
+
+  const btn = document.getElementById("btn-crear-pedido");
+  btn.disabled = true; btn.textContent = "Guardando…";
+  setLoading(true);
+
+  try {
+    const hoy    = new Date().toISOString().split("T")[0];
+    const nPed   = "PED-" + new Date().getFullYear() + "-" + String(pedidos.length + 1).padStart(3,"0");
+    const importe= cant * precio;
+
+    const obsCompleto = obs ? `${obs} | Firma: ${firma}` : `Firma: ${firma}`;
+    // Crear fila en tPedidos
+    await añadirFila("tPedidos", [
+      nPed, currentUser.username, dpto, proy, hoy, fecha,
+      "Pendiente", importe, prov, obsCompleto
+    ]);
+
+    // Crear línea en tLineasPedido
+    const idLinea = "LIN-" + Date.now();
+    await añadirFila("tLineasPedido", [
+      idLinea, nPed, cod, desc, prov, cant, precio, importe, alm, "Pendiente", 0, ""
+    ]);
+
+    cerrarModal();
+    await cargarDatos();
+  } catch(e) {
+    alert("Error al guardar: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crear Pedido`;
+    setLoading(false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  APROBACIÓN
+// ═══════════════════════════════════════════════════════════════
+function renderAprobacion() {
+  seleccionados.clear();
+  actualizarResumen();
+
+  const pend   = pedidos.filter(p => p.Estado === "Pendiente");
+  const grupos = {};
+  pend.forEach(p => {
+    const pv = p.Proveedor_Principal || p.Proveedor || "Sin proveedor";
+    if (!grupos[pv]) grupos[pv] = [];
+    grupos[pv].push(p);
+  });
+
+  const cont = document.getElementById("apro-contenido");
+  if (!Object.keys(grupos).length) {
+    cont.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No hay pedidos pendientes de aprobación</p></div>`;
+    return;
+  }
+
+  cont.innerHTML = Object.entries(grupos).map(([prov, lineas]) => `
+    <div class="proveedor-card">
+      <div class="proveedor-header">
+        <div class="proveedor-name">
+          <div class="proveedor-icon">🏢</div>
+          <div>
+            <div>${prov}</div>
+            <div style="font-weight:400;font-size:12px;color:var(--gris3)">
+              ${lineas.length} línea${lineas.length>1?"s":""} ·
+              €${lineas.reduce((s,l)=>s+(+l.Importe_Total||0),0).toLocaleString("es-ES",{minimumFractionDigits:2})}
+            </div>
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="proveedor-body">
+        ${lineas.map(l => `
+          <div class="linea-row">
+            <div class="linea-check" id="chk-${l._index}" onclick="toggleLinea('${l._index}',${+l.Cantidad||0},${+l.Importe_Total||0})"></div>
+            <div class="linea-info">
+              <div class="linea-art">(${l.Articulo_Cod}) ${l.Articulo_Desc}</div>
+              <div class="linea-meta">${l.Cantidad} uds · ${(l.Solicitante||"").split("@")[0]} · ${l.Proyecto}</div>
+            </div>
+            <div class="linea-imp">€${(+l.Importe_Total||0).toLocaleString("es-ES",{minimumFractionDigits:2})}</div>
+          </div>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function toggleLinea(idx, cant, importe) {
+  const chk = document.getElementById("chk-"+idx);
+  if (seleccionados.has(idx)) { seleccionados.delete(idx); chk.classList.remove("checked"); }
+  else                        { seleccionados.add(idx);    chk.classList.add("checked");    }
+  actualizarResumen();
+}
+
+function actualizarResumen() {
+  const sel      = pedidos.filter(p => seleccionados.has(p._index.toString())||seleccionados.has(p._index));
+  const lineas   = sel.length;
+  const unidades = sel.reduce((s,p)=>s+(+p.Cantidad||0),0);
+  const importe  = sel.reduce((s,p)=>s+(+p.Importe_Total||0),0);
+  document.getElementById("res-lineas").textContent   = lineas;
+  document.getElementById("res-unidades").textContent = unidades;
+  document.getElementById("res-importe").textContent  = "€"+importe.toLocaleString("es-ES",{minimumFractionDigits:2});
+  const btn = document.getElementById("btn-enviar");
+  btn.disabled      = lineas===0;
+  btn.style.opacity = lineas>0?"1":".45";
+}
+
+function abrirConfirmar() {
+  const sel   = pedidos.filter(p => seleccionados.has(p._index)||seleccionados.has(p._index.toString()));
+  const provs = [...new Set(sel.map(p => p.Proveedor_Principal||p.Proveedor||"—"))];
+  const total = sel.reduce((s,p)=>s+(+p.Importe_Total||0),0);
+
+  document.getElementById("confirm-detalle").innerHTML = `
+    <tr><td>Proveedor${provs.length>1?"es":""}</td><td style="color:var(--azul2)">${provs.join(", ")}</td></tr>
+    <tr><td>Líneas</td><td>${sel.length}</td></tr>
+    <tr><td>Importe</td><td style="color:var(--verde)">€${total.toLocaleString("es-ES",{minimumFractionDigits:2})}</td></tr>`;
+
+  document.getElementById("confirm-arts").innerHTML =
+    "<div style='margin-top:10px;font-size:11px;font-weight:700;color:var(--gris3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px'>Artículos:</div>" +
+    sel.map(p => `
+      <div class="confirm-art">
+        <div class="confirm-art-name">(${p.Articulo_Cod}) ${p.Articulo_Desc}</div>
+        <div class="confirm-art-calc">${p.Cantidad} × €${(+p.Precio).toFixed(2)} = €${(+p.Importe_Total||0).toLocaleString("es-ES",{minimumFractionDigits:2})}</div>
+      </div>`).join("");
+
+  document.getElementById("modal-confirmar").classList.add("open");
+}
+
+function cerrarConfirmar() { document.getElementById("modal-confirmar").classList.remove("open"); }
+
+function generarXMLSage(pedidosSeleccionados) {
+  const hoy = new Date().toISOString().split("T")[0];
+  const lineas = pedidosSeleccionados.map((p, i) => `
+    <Lin_PedidoCompra>
+      <Lin_NumLinea>${i + 1}</Lin_NumLinea>
+      <Lin_CodArticulo>${p.Articulo_Cod || ""}</Lin_CodArticulo>
+      <Lin_Descripcion>${(p.Articulo_Desc || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</Lin_Descripcion>
+      <Lin_Cantidad>${+p.Cantidad || 1}</Lin_Cantidad>
+      <Lin_Precio>${(+p.Precio || 0).toFixed(4)}</Lin_Precio>
+      <Lin_Descuento>0</Lin_Descuento>
+      <Lin_CodAlmacen></Lin_CodAlmacen>
+      <Lin_Observaciones>${(p.Observaciones || "").replace(/&/g,"&amp;")}</Lin_Observaciones>
+    </Lin_PedidoCompra>`).join("");
+
+  // Sage 200c Advance agrupa por proveedor
+  const grupos = {};
+  pedidosSeleccionados.forEach(p => {
+    const prov = p.Proveedor_Principal || p.Proveedor || "";
+    if (!grupos[prov]) grupos[prov] = [];
+    grupos[prov].push(p);
+  });
+
+  const cabeceras = Object.entries(grupos).map(([prov, lins], idx) => {
+    const total = lins.reduce((s, l) => s + (+l.Importe_Total || 0), 0);
+    const lineasProv = lins.map((p, i) => `
+      <Lin_PedidoCompra>
+        <Lin_NumLinea>${i + 1}</Lin_NumLinea>
+        <Lin_CodArticulo>${p.Articulo_Cod || ""}</Lin_CodArticulo>
+        <Lin_Descripcion>${(p.Articulo_Desc || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</Lin_Descripcion>
+        <Lin_Cantidad>${+p.Cantidad || 1}</Lin_Cantidad>
+        <Lin_Precio>${(+p.Precio || 0).toFixed(4)}</Lin_Precio>
+        <Lin_Descuento>0</Lin_Descuento>
+        <Lin_Observaciones>${(p.Observaciones || "").replace(/&/g,"&amp;")}</Lin_Observaciones>
+      </Lin_PedidoCompra>`).join("");
+
+    return `
+  <Cab_PedidoCompra>
+    <Cab_CodigoEmpresa>1</Cab_CodigoEmpresa>
+    <Cab_SerieDocumento>PC</Cab_SerieDocumento>
+    <Cab_FechaDocumento>${hoy}</Cab_FechaDocumento>
+    <Cab_CodigoProveedor>${prov.replace(/&/g,"&amp;")}</Cab_CodigoProveedor>
+    <Cab_ReferenciaInterna>${lins[0].ID || ""}</Cab_ReferenciaInterna>
+    <Cab_FechaEntrega>${lins[0].Fecha_Necesaria || hoy}</Cab_FechaEntrega>
+    <Cab_Observaciones>Pedido generado desde APP ERP 53Biologics</Cab_Observaciones>
+    <Cab_ImporteTotal>${total.toFixed(2)}</Cab_ImporteTotal>
+    <Lineas>${lineasProv}
+    </Lineas>
+  </Cab_PedidoCompra>`;
+  }).join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<ImportacionPedidosCompra>
+  <Version>1.0</Version>
+  <FechaExportacion>${hoy}</FechaExportacion>
+  <Empresa>53Biologics</Empresa>${cabeceras}
+</ImportacionPedidosCompra>`;
+}
+
+function descargarXML(xml, nombreArchivo) {
+  const blob = new Blob([xml], { type: "application/xml;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = nombreArchivo; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function subirXMLOneDrive(xml, nombreArchivo) {
+  const tokenResp = await msalApp.acquireTokenSilent({ scopes, account: currentUser });
+  const token = tokenResp.accessToken;
+  // Sube a OneDrive personal: APP ERP/sage_imports/<nombreArchivo>
+  const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/APP%20ERP/sage_imports/${encodeURIComponent(nombreArchivo)}:/content`;
+  const resp = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/octet-stream"
+    },
+    body: xml
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Error subiendo a OneDrive (${resp.status}): ${err.error?.message || resp.statusText}`);
+  }
+  return await resp.json();
+}
+
+async function enviarSage() {
+  setLoading(true);
+  cerrarConfirmar();
+  try {
+    const sel = pedidos.filter(p => seleccionados.has(p._index)||seleccionados.has(p._index.toString()));
+
+    // 1. Generar XML para Sage 200c
+    const xml = generarXMLSage(sel);
+    const fecha = new Date().toISOString().replace(/[:.]/g,"-").slice(0,16);
+    const nombreArchivo = `Pedidos_Sage200c_${fecha}.xml`;
+
+    // 2. Subir a OneDrive (carpeta APP ERP/sage_imports) para que sincronice al escritorio remoto
+    let subidoOneDrive = false;
+    try {
+      await subirXMLOneDrive(xml, nombreArchivo);
+      subidoOneDrive = true;
+    } catch(uploadErr) {
+      console.warn("No se pudo subir a OneDrive, descargando localmente:", uploadErr.message);
+      descargarXML(xml, nombreArchivo);
+    }
+
+    // 3. Marcar como Enviado_SAGE en el Excel
+    await Promise.all(sel.map(p => {
+      const vals = [p.ID,p.Solicitante,p.Departamento,p.Proyecto,p.Fecha_Solicitud,
+                    p.Fecha_Necesaria,"Enviado_SAGE",p.Importe_Total,p.Proveedor_Principal||p.Proveedor,p.Observaciones];
+      return actualizarFila("tPedidos", p._index, vals);
+    }));
+
+    await cargarDatos();
+
+    if (subidoOneDrive) {
+      alert(`✅ XML guardado en OneDrive:\n📁 APP ERP > sage_imports > ${nombreArchivo}\n\nVerás el archivo sincronizado en el escritorio remoto.\nDesde Sage 200c: Compras > Pedidos de Compra > Importar`);
+    } else {
+      alert(`✅ XML descargado localmente (OneDrive no disponible):\n${nombreArchivo}\n\nCópialo al escritorio remoto e impórtalo en Sage 200c:\nCompras > Pedidos de Compra > Importar`);
+    }
+  } catch(e) {
+    alert("Error: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// cerrar dropdown
+document.addEventListener("click", e => {
+  if (!e.target.closest(".search-art-wrap"))
+    document.getElementById("art-dropdown").className="";
+});
+</script>
+</body>
+</html>
